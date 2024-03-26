@@ -129,14 +129,34 @@ data(College,package = "ISLR2")
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+n <- nrow(College)
+library(leaps)
+train_index <- sample(1:n, 0.8 * n, replace = FALSE)
+train_data <- College[train_index, ]
+test_data <- College[-train_index, ]
+
+#conduct a forward selection
+fit.fwd = regsubsets(Outstate~., data=train_data, nvmax=17, method="forward")
+fit.summary = summary(fit.fwd)
+
+
+which.min(fit.summary$cp)    #Estimate of the test error, lower is better.
+which.min(fit.summary$bic)   #Takes a small value for models with low test errors, so lower is better generally.
+which.max(fit.summary$adjr2) #A larger value indicates a model with low test error.
+
+#Show the Mallows's Cp statistic, BIC, Adjusted R square value to decide which how many predictors we will use.
+par(mfrow=c(2,2))
+plot(1:17, fit.summary$cp,xlab="Variables",ylab="Cp",main="Cp", type='b')
+plot(1:17, fit.summary$bic,xlab="Variables",ylab="BIC",main="BIC", type='b')
+plot(1:17, fit.summary$adjr2,xlab="Variables",ylab="Adjusted R2",main="Adjusted R2", type='b')
+
+coef(fit.fwd,6)
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The model we use include 6 predictors: PrivateYes, Room.Board, PhD, perc.alumni, Expend, Grad.Rate.
 
 
 ~~~
@@ -148,14 +168,16 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(mgcv)
+gam.m1 <- gam(Outstate ~ Private+ poly(Room.Board,2)+ poly(PhD,2) + poly(perc.alumni,2) + poly(Expend,2) + poly(Grad.Rate,2), data = train_data)
+gam.m1
+
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+out of state tuition increases as room and board costs get higher and also increases as the proportion of alumni who donate increase.
 
 
 ~~~
@@ -166,15 +188,15 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+preds = predict(gam.m1,newdata = test_data)
+mse = mean((test_data$Outstate - preds)^2)
+mse
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
-
+The mse is large, the model is not ideal. 
 
 ~~~
 
@@ -184,15 +206,16 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+gam.m2 = gam(Outstate~Private+poly(Room.Board,4)+poly(PhD,4)+poly(perc.alumni,2)+poly(Expend,4), data=college_train)
+gam.m3 = gam(Outstate~Private+poly(Room.Board,4)+poly(PhD,4)+poly(perc.alumni,2)+poly(Expend,4)+Grad.Rate, data=college_train) # Linear Grad rate
+gam.m4 = gam(Outstate~Private+poly(Room.Board,4)+poly(PhD,4)+poly(perc.alumni,2)+poly(Expend,4)+poly(Grad.Rate,4), data=college_train) # Spline with 4 degrees
+anova(gam.m2,gam.m3,gam.m4,gam.m1, test="F")
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
-
+`Grad.Rate` is a non-linear function(spline with degree 2) is needed.
 
 ~~~
 
@@ -204,14 +227,21 @@ Fit some of the non-linear models investigated in chapter 7 to the `Auto` data s
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+pairs(Auto[1:7])
+fit.1 = lm(mpg ~ displacement ,data=Auto)
+fit.2 = lm(mpg ~ poly(displacement ,2) ,data=Auto)
+fit.3 = lm(mpg ~ poly(displacement ,3) ,data=Auto)
+fit.4 = lm(mpg ~ poly(displacement ,4) ,data=Auto)
+fit.5 = lm(mpg ~ poly(displacement ,5) ,data=Auto)
+fit.6 = lm(mpg ~ poly(displacement ,6) ,data=Auto)
+
+anova(fit.1,fit.2,fit.3,fit.4,fit.5,fit.6)
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The result shows that there a obvious quadratic relationship between displacement and mpg.
 
 
 ~~~
@@ -227,8 +257,18 @@ $Y-\hat{\beta}_1X_1=\beta_0+\beta_2X_2+\epsilon$
 You can do this as follows:
 
 ```{r,eval=FALSE}
-> a <- y - beta1 * x1
-> beta2 <- lm(a ~ x2)$coef [2]
+
+set.seed(123)  # Set seed for reproducibility
+X1 = rnorm(100, sd=2)
+X2 = rnorm(100, sd=sqrt(2))
+eps = rnorm(100, sd = 1)
+b0 = 5; b1=2.5 ; b2=11.5
+Y = b0 +b1*X1 + b2*X2 + eps
+beta1 = 0.1
+
+a=Y-beta1*X1
+beta2 = lm(a ~ X2)$coef[2]
+beta2
 ```
 
 (d) Keeping $\hat{\beta}_2$  fixed, fit the model
@@ -236,8 +276,9 @@ $Y-\hat{\beta}_2X_2=\beta_0+\beta_1X_1+\epsilon$
 You can do this as follows:
 
 ```{r,eval=FALSE}
-> a <- y - beta2 * x2
-> beta1 <- lm(a ~ x1)$coef [2]
+a=Y-beta2*X2
+beta1 = lm(a~X1)$coef[2]
+beta1
 ```
 
 (e) Write a for loop to repeat (c) and (d) 1,000 times. Report the estimates of $\hat{\beta}_0$ , $\hat{\beta}_1$ , and $\hat{\beta}_2$  at each iteration of the for loop.  Create a plot in which each of these values is displayed, with $\hat{\beta}_0$ , $\hat{\beta}_1$ , and $\hat{\beta}_2$  each shown in a different color.
@@ -246,8 +287,39 @@ You can do this as follows:
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+beta.df = data.frame("beta0"=rep(0,1000),"beta1"=rep(0,1000),"beta2"=rep(0,1000))
+beta1 = 0.1
+
+for (i in 1:1000){
+  a=Y-beta1*X1
+  model = lm(a~X2)
+  beta2 = model$coef[2]
+  beta.df$beta2[i]= beta2
+  
+  a=Y-beta2*X2
+  model = lm(a~X1)
+  beta1 = model$coef[2]
+  beta.df$beta1[i]=beta1
+ 
+  beta.df$beta0[i]=model$coef[1]
+  }
+
+
+beta.df$beta0[5]
+beta.df$beta1[5]
+beta.df$beta2[5]
+plot(1:1000,beta.df$beta2,ylim=range(0:12),type='l', lwd="3", col="blue",xlab="Iteration",ylab="Coefficient value")
+title("Coefficients found by iterating, and overlaid values from lm() function.")
+lines(1:1000,beta.df$beta1, col="red", lwd=3)
+lines(1:1000,beta.df$beta0, col="green",lwd=3)
+
+# Using results from multiple linear regression in part (f)
+abline(h=4.996049, lty=2, lwd=2)
+abline(h=2.526440, lty=2, lwd=2, col="yellow")
+abline(h=11.536752, lty=2, lwd=2, col="green")
+
+legend(900,10, legend=c("beta0", "beta1", "beta2", "beta0.lm", "beta1.lm", "beta2.lm"),
+       col=c("green","red","blue","black","yellow","green"), lty = c(1,1,1,2,2,2), xpd=T)
 ```
 
 
@@ -257,15 +329,14 @@ Your code:
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+lm.fit = lm(Y~X1+X2)
+coef(lm.fit)
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
-
+The coefficients found by multiple linear regression exactly match those found by iteration.
 
 ~~~
 
@@ -273,16 +344,10 @@ Please write your answer in full sentences.
 (g) On this data set, how many backfitting iterations were required in order to obtain a "good" approximation to the multiple regression coefficient estimates?
 
 
-Your code:
-```{r,echo=TRUE}
-#
-#
-```
-
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+Five iterations were needed to achieve a very good approximation to the multiple linear regression results. 
 
 
 ~~~
@@ -293,14 +358,57 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+# Ensure the required packages are installed and loaded
+if (!require('MASS')) install.packages('MASS', dependencies=TRUE)
+library(MASS)
+
+set.seed(42)  # For reproducibility
+
+# Generate synthetic data
+p <- 100  # Number of predictors
+n <- 1000  # Number of observations
+X <- matrix(rnorm(n * p), n, p)  # Predictor matrix
+beta <- rnorm(p)  # True coefficients
+Y <- X %*% beta + rnorm(n)  # Response variable
+
+# Fit multiple linear regression to get true coefficients
+true_fit <- lm(Y ~ X)
+
+# Backfitting procedure
+coefs_backfit <- rep(0, p)
+max_iterations <- 1000
+tolerance <- 1e-6
+coefs_history <- matrix(NA, nrow = max_iterations, ncol = p)
+
+for (iteration in 1:max_iterations) {
+  coefs_history[iteration, ] <- coefs_backfit
+  for (j in 1:p) {
+    # Residuals excluding the effect of the j-th predictor
+    Y_residuals <- Y - X %*% coefs_backfit + X[, j] * coefs_backfit[j]
+    # Update the j-th coefficient using simple linear regression
+    fit <- lm(Y_residuals ~ X[, j] - 1)  # -1 to omit the intercept
+    coefs_backfit[j] <- fit$coefficients
+  }
+  
+  # Check for convergence
+  if (max(abs(coefs_history[iteration, ] - coefs_backfit)) < tolerance) {
+    message(sprintf("Convergence reached after %d iterations", iteration))
+    coefs_history <- coefs_history[1:iteration, ]
+    break
+  }
+}
+
+# Plot the convergence of coefficients
+matplot(coefs_history, type = 'l', lty = 1, main = "Convergence of Backfitting Coefficients",
+        xlab = "Iteration", ylab = "Coefficient Estimate", col = rainbow(p))
+legend("topright", legend = c("True Coefficients", "Backfitting Estimates"), col = c(1, 2), lty = 1:2)
+
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+12 iterations are needed.
 
 
 ~~~
@@ -313,14 +421,21 @@ This question uses the variables dis (the weighted mean of distances to five Bos
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+data(Boston,package = "MASS")
+model.1 = glm(nox~poly(dis,3), data=Boston)
+summary(model.1)
+dis.grid = seq(from=min(Boston$dis),to=max(Boston$dis),0.2)
+preds=predict(model.1,newdata=list(dis=dis.grid), se=T)
+
+plot(dis.grid,preds$fit,col="blue",lwd=3)
+lines(dis.grid,preds$fit+2*preds$se,col="red",lwd=3,lty=2)
+lines(dis.grid,preds$fit-2*preds$se,col="yellow",lwd=3,lty=2)
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The regression summary shows a cubic fit is statistically significant.
 
 
 ~~~
@@ -330,14 +445,33 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+set.seed(123)
+n <- nrow(Boston)
+
+train_index <- sample(1:n, 0.8 * n, replace = FALSE)
+boston_train <- Boston[train_index, ]
+boston_test <- Boston[-train_index, ]
+
+rss = rep(0,10)
+colours = rainbow(10)
+plot(Boston$dis,Boston$nox,xlab="Distance", ylab="Nox values", main="Polynomial fits from degree 1-10.")
+
+for (i in 1:10){
+  model = glm(nox~poly(dis,i), data=boston_train)
+  rss[i] = sum((boston_test$nox - predict(model,newdata=list(dis=boston_test$dis)))^2)
+  preds=predict(model,newdata=list(dis=dis.grid))
+  lines(dis.grid,preds,col=colours[i], lwd=2, lty=1)
+}
+
+legend(10,0.8,legend=1:10, col= colours[1:10],lty=1,lwd=2)
+plot(1:10,rss,xlab="Polynomial degree", ylab="RSS", main="RSS on test set vs polynomial degree", type='b')
+
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The RSS decreases from the linear to the cubic model, and increases thereafter. This supports the argument that the cubic model provides the best fit.
 
 
 ~~~
@@ -347,14 +481,46 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(boot)
+cv_poly_degree <- function(data, max_degree = 5) {
+  cv_errors <- rep(0, max_degree)
+  
+  # Cross-validation for polynomial degrees from 1 to max_degree
+  for (degree in 1:max_degree) {
+    # Create a formula with a polynomial term
+    formula <- as.formula(paste('nox ~ poly(dis, ', degree, ')', sep = ''))
+    
+    # Fit model and perform k-fold cross-validation
+    glm_fit <- glm(formula, data = data)
+    cv_fit <- cv.glm(data, glm_fit, K = 10)  # 10-fold CV
+    
+    # Store the cross-validation error
+    cv_errors[degree] <- cv_fit$delta[1]
+  }
+  
+  return(cv_errors)
+}
+
+# Perform cross-validation for degrees 1 to 5
+set.seed(42)  # For reproducibility
+max_degree <- 5
+cv_errors <- cv_poly_degree(Boston, max_degree)
+
+# Find the optimal degree with the lowest CV error
+optimal_degree <- which.min(cv_errors)
+
+# Plot the cross-validation errors for each degree
+plot(1:max_degree, cv_errors, type = 'b', xlab = 'Polynomial Degree', ylab = 'CV Error',
+     main = 'Cross-Validation Error for Different Polynomial Degrees')
+points(optimal_degree, cv_errors[optimal_degree], col = 'red', cex = 1.5, pch = 20)
+
+list(optimal_degree = optimal_degree, cv_errors = cv_errors)
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The optimal degree find by cv is 4, which is not cubic.
 
 
 ~~~
@@ -364,14 +530,22 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+spline.fit = lm(nox~bs(dis,df=4), data=Boston)
+summary(spline.fit)
+attr(bs(Boston$dis,df=4),"knots")
+plot(Boston$dis,Boston$nox,xlab="Distance", ylab="Nox values")
+preds = predict(spline.fit, newdata=list(dis=dis.grid), se=T)
+lines(dis.grid, preds$fit,col="blue",lwd=3)
+lines(dis.grid, preds$fit+2*preds$se,col="red",lwd=3,lty=2)
+lines(dis.grid, preds$fit-2*preds$se,col="green",lwd=3,lty=2)
+
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+The resulting spline fit is very similar to that of polynomial regression using degree 3.
+  
 
 
 ~~~
@@ -381,14 +555,27 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+rss = rep(0,18)
+colours = rainbow(18)
+plot(Boston$dis,Boston$nox,xlab="Distance", ylab="Nox values",main="Regression splines using degrees from 3-10")
+
+# Degree of freedom starts from 3, anything below is too small.
+for (i in 3:20){ 
+  spline.model = lm(nox~bs(dis,df=i), data=boston_train)
+  rss[i-2] = sum((boston_test$nox - predict(spline.model,newdata=list(dis=boston_test$dis)))^2)
+  preds=predict(spline.model,newdata=list(dis=dis.grid))
+  lines(dis.grid,preds,col=colours[i-2], lwd=2, lty=1)
+}
+legend(10,0.8,legend=3:20, col=colours[1:18],lty=1,lwd=2)
+
+# Degree with minimum RSS value.
+which.min(rss)+2
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+Smaller differences between spline fits than with the polynomial fits. RSS is lowest for the degree 12 model.
 
 
 ~~~
@@ -397,17 +584,44 @@ Please write your answer in full sentences.
 
 
 Your code:
-```{r,echo=TRUE}
-#
-#
+```{r,echo=TRUE, warning=FALSE}
+k=10
+set.seed(3)
+
+folds = sample(1:k, nrow(Boston), replace=T)
+cv.errors = matrix(NA,k,18, dimnames = list(NULL, paste(3:20)))  #Matrix to store cv errors for degrees 3 to 20.
+
+  # Create models (total=k) for each degree using the training folds.
+  # Predict on held out folds and calculate their MSE's(total=k).
+  # Continue until all j degrees have been used.
+  # Take the mean of MSE's for each degree.
+
+for(j in 3:20){
+  for(i in 1:k){
+    spline.model=lm(nox~bs(dis,df=j), data=Boston[folds!=i,])
+    pred=predict(spline.model,Boston[folds==i,],id=i)
+    cv.errors[i,j-2]=mean((Boston$nox[folds==i] - pred)^2)
+  }
+}
+
+mean.cv.errors = apply(cv.errors,2,mean)
+mean.cv.errors[which.min(mean.cv.errors)]
+set.seed(3)
+cv.err = rep(0,18)
+  
+for(j in 3:20){
+    fit=glm(nox~bs(dis,df=j), data=Boston)
+    cv.err[j-2] = cv.glm(Boston, fit, K=10)$delta[1]
+}
+
+which.min(cv.err)+2
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
-
-
+The cv.glm() method finds a minimum at degree 8. This is the same degree found using the previous cross validation method, but different to using a validation set.
+  
 ~~~
 
 
